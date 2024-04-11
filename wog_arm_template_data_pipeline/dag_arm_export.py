@@ -5,7 +5,7 @@ from azure.identity import DefaultAzureCredential, UsernamePasswordCredential, I
 from  azure.mgmt.resource.resources.v2019_07_01 import *
 from azure.mgmt.resource import ResourceManagementClient, SubscriptionClient
 import os
-from export_arm_to_blob_operator import create_operator_export_arm
+from operator_export_arm_to_blob import create_operator_export_arm
 
 default_args = {
     'owner': 'airflow',
@@ -61,7 +61,7 @@ with DAG(
             
          ) as dag:
     
-    start = EmptyOperator(task_id='start_dag')
+    start = EmptyOperator(task_id='start')
     
     subRGs = get_subs_and_rgs()
 
