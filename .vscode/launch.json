@@ -19,7 +19,7 @@
                 "2024-05-26T13:34:55Z" // <-- an execution date
             ],
             "justMyCode": false, // <--- if FALSE the debugger will work even in the code which you didnt wrote, useful if you want to debug the airlfow behavior too
-        },
+        }
 
     ]
 }
