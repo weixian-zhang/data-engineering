@@ -57,11 +57,13 @@ with DAG(
             dag_id='arm_export_dag',
             default_args=default_args,
             catchup=False,
-            schedule_interval='@once' # or None
+            schedule_interval=None
             
          ) as dag:
     
     start = EmptyOperator(task_id='start')
+
+    storageUrl = os.environ.get('STORAGE_URL')
     
     subRGs = get_subs_and_rgs()
 
@@ -70,6 +72,11 @@ with DAG(
         subName = srg['subscription_name']
         rg = srg['resource_group']
 
-        export_arm_operator = create_operator_export_arm(index=idx, subId=subId, subName=subName, resourceGroup=rg, dag=dag)
+        export_arm_operator = create_operator_export_arm(
+                                                         subId=subId, 
+                                                         subName=subName, 
+                                                         resourceGroup=rg, 
+                                                         storageUrl= storageUrl,
+                                                         dag=dag)
 
         start >> export_arm_operator

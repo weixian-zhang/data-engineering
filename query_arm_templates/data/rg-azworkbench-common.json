@@ -1,0 +1,1071 @@
+{
+    "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+    "contentVersion": "1.0.0.0",
+    "parameters": {},
+    "variables": {},
+    "resources": [
+        {
+            "type": "Microsoft.Cdn/profiles",
+            "apiVersion": "2022-11-01-preview",
+            "name": "frontdoor-azworkbench-premium",
+            "location": "Global",
+            "sku": {
+                "name": "Premium_AzureFrontDoor"
+            },
+            "kind": "frontdoor",
+            "identity": {
+                "type": "SystemAssigned"
+            },
+            "properties": {
+                "originResponseTimeoutSeconds": 30,
+                "extendedProperties": {
+                    "MigratedFrom": "/subscriptions/ee611083-4581-4ba1-8116-a502d4539206/resourceGroups/rg-azworkbench-common/providers/Microsoft.Network/frontdoors/frontdoor-azworkbench"
+                }
+            }
+        },
+        {
+            "type": "microsoft.insights/activitylogalerts",
+            "apiVersion": "2020-10-01",
+            "name": "VM-Planned-Maintenance",
+            "location": "global",
+            "properties": {
+                "scopes": [
+                    "/subscriptions/ee611083-4581-4ba1-8116-a502d4539206"
+                ],
+                "condition": {
+                    "allOf": [
+                        {
+                            "field": "category",
+                            "equals": "ServiceHealth"
+                        },
+                        {
+                            "anyOf": [
+                                {
+                                    "field": "properties.incidentType",
+                                    "equals": "Maintenance"
+                                }
+                            ]
+                        },
+                        {
+                            "field": "properties.impactedServices[*].ServiceName",
+                            "containsAny": [
+                                "Virtual Machines",
+                                "Virtual Machine Scale Sets"
+                            ]
+                        },
+                        {
+                            "field": "properties.impactedServices[*].ImpactedRegions[*].RegionName",
+                            "containsAny": [
+                                "Southeast Asia"
+                            ]
+                        }
+                    ]
+                },
+                "actions": {
+                    "actionGroups": [
+                        {
+                            "actionGroupId": "/subscriptions/ee611083-4581-4ba1-8116-a502d4539206/resourcegroups/rggccshol/providers/microsoft.insights/actiongroups/email-me",
+                            "webhookProperties": {}
+                        }
+                    ]
+                },
+                "enabled": true
+            }
+        },
+        {
+            "type": "Microsoft.Network/frontdoorwebapplicationfirewallpolicies",
+            "apiVersion": "2022-05-01",
+            "name": "wafPoliciesFrondoorAzworkbenchPremium",
+            "location": "Global",
+            "sku": {
+                "name": "Premium_AzureFrontDoor"
+            },
+            "properties": {
+                "policySettings": {
+                    "enabledState": "Enabled",
+                    "mode": "Prevention",
+                    "customBlockResponseStatusCode": 403,
+                    "customBlockResponseBody": "RGV0ZWNlZCB1bnNhZmUgcmVxdWVzdCwgQmxvY2sgYWN0aW9uIGV4ZWN1dGVk",
+                    "requestBodyCheck": "Enabled"
+                },
+                "customRules": {
+                    "rules": [
+                        {
+                            "name": "RateLimit",
+                            "enabledState": "Enabled",
+                            "priority": 500,
+                            "ruleType": "RateLimitRule",
+                            "rateLimitDurationInMinutes": 1,
+                            "rateLimitThreshold": 80,
+                            "matchConditions": [
+                                {
+                                    "matchVariable": "RequestUri",
+                                    "operator": "Contains",
+                                    "negateCondition": false,
+                                    "matchValue": [
+                                        "api",
+                                        "beta",
+                                        "www"
+                                    ],
+                                    "transforms": [
+                                        "Lowercase"
+                                    ]
+                                }
+                            ],
+                            "action": "Block"
+                        },
+                        {
+                            "name": "RequestSizeLimit",
+                            "enabledState": "Enabled",
+                            "priority": 600,
+                            "ruleType": "MatchRule",
+                            "rateLimitDurationInMinutes": 1,
+                            "rateLimitThreshold": 100,
+                            "matchConditions": [
+                                {
+                                    "matchVariable": "RequestHeader",
+                                    "selector": "Content-Length",
+                                    "operator": "GreaterThan",
+                                    "negateCondition": false,
+                                    "matchValue": [
+                                        "15000000"
+                                    ],
+                                    "transforms": []
+                                },
+                                {
+                                    "matchVariable": "RequestUri",
+                                    "operator": "Contains",
+                                    "negateCondition": false,
+                                    "matchValue": [
+                                        "api"
+                                    ],
+                                    "transforms": [
+                                        "Lowercase"
+                                    ]
+                                }
+                            ],
+                            "action": "Block"
+                        }
+                    ]
+                },
+                "managedRules": {
+                    "managedRuleSets": [
+                        {
+                            "ruleSetType": "Microsoft_DefaultRuleSet",
+                            "ruleSetVersion": "2.0",
+                            "ruleSetAction": "Block",
+                            "ruleGroupOverrides": [],
+                            "exclusions": []
+                        },
+                        {
+                            "ruleSetType": "Microsoft_BotManagerRuleSet",
+                            "ruleSetVersion": "1.0",
+                            "ruleGroupOverrides": [],
+                            "exclusions": []
+                        }
+                    ]
+                }
+            }
+        },
+        {
+            "type": "Microsoft.Cdn/profiles/afdendpoints",
+            "apiVersion": "2022-11-01-preview",
+            "name": "frontdoor-azworkbench-premium/frontdoor-azworkbench",
+            "location": "Global",
+            "dependsOn": [
+                "[resourceId('Microsoft.Cdn/profiles', 'frontdoor-azworkbench-premium')]"
+            ],
+            "properties": {
+                "enabledState": "Enabled"
+            }
+        },
+        {
+            "type": "Microsoft.Cdn/profiles/customdomains",
+            "apiVersion": "2022-11-01-preview",
+            "name": "frontdoor-azworkbench-premium/frontdoor-azworkbench-azurefd-net",
+            "dependsOn": [
+                "[resourceId('Microsoft.Cdn/profiles', 'frontdoor-azworkbench-premium')]"
+            ],
+            "properties": {
+                "hostName": "frontdoor-azworkbench.azurefd.net",
+                "tlsSettings": {
+                    "certificateType": "ManagedCertificate",
+                    "minimumTlsVersion": "TLS12"
+                },
+                "extendedProperties": {
+                    "IsInternal": "true",
+                    "RoutesList": "[[\"Http2Https\"]"
+                }
+            }
+        },
+        {
+            "type": "Microsoft.Cdn/profiles/origingroups",
+            "apiVersion": "2022-11-01-preview",
+            "name": "frontdoor-azworkbench-premium/backend-api-dev",
+            "dependsOn": [
+                "[resourceId('Microsoft.Cdn/profiles', 'frontdoor-azworkbench-premium')]"
+            ],
+            "properties": {
+                "loadBalancingSettings": {
+                    "sampleSize": 4,
+                    "successfulSamplesRequired": 2,
+                    "additionalLatencyInMilliseconds": 0
+                },
+                "sessionAffinityState": "Disabled"
+            }
+        },
+        {
+            "type": "Microsoft.Cdn/profiles/origingroups",
+            "apiVersion": "2022-11-01-preview",
+            "name": "frontdoor-azworkbench-premium/backend-api-prod",
+            "dependsOn": [
+                "[resourceId('Microsoft.Cdn/profiles', 'frontdoor-azworkbench-premium')]"
+            ],
+            "properties": {
+                "loadBalancingSettings": {
+                    "sampleSize": 4,
+                    "successfulSamplesRequired": 2,
+                    "additionalLatencyInMilliseconds": 0
+                },
+                "sessionAffinityState": "Disabled"
+            }
+        },
+        {
+            "type": "Microsoft.Cdn/profiles/origingroups",
+            "apiVersion": "2022-11-01-preview",
+            "name": "frontdoor-azworkbench-premium/backend-new-portal-prod",
+            "dependsOn": [
+                "[resourceId('Microsoft.Cdn/profiles', 'frontdoor-azworkbench-premium')]"
+            ],
+            "properties": {
+                "loadBalancingSettings": {
+                    "sampleSize": 4,
+                    "successfulSamplesRequired": 2,
+                    "additionalLatencyInMilliseconds": 0
+                },
+                "healthProbeSettings": {
+                    "probePath": "/",
+                    "probeRequestType": "HEAD",
+                    "probeProtocol": "Https",
+                    "probeIntervalInSeconds": 30
+                },
+                "sessionAffinityState": "Disabled"
+            }
+        },
+        {
+            "type": "Microsoft.Cdn/profiles/origingroups",
+            "apiVersion": "2022-11-01-preview",
+            "name": "frontdoor-azworkbench-premium/backend-portal-dev",
+            "dependsOn": [
+                "[resourceId('Microsoft.Cdn/profiles', 'frontdoor-azworkbench-premium')]"
+            ],
+            "properties": {
+                "loadBalancingSettings": {
+                    "sampleSize": 4,
+                    "successfulSamplesRequired": 2,
+                    "additionalLatencyInMilliseconds": 0
+                },
+                "sessionAffinityState": "Disabled"
+            }
+        },
+        {
+            "type": "Microsoft.Cdn/profiles/origingroups",
+            "apiVersion": "2022-11-01-preview",
+            "name": "frontdoor-azworkbench-premium/Maintenance",
+            "dependsOn": [
+                "[resourceId('Microsoft.Cdn/profiles', 'frontdoor-azworkbench-premium')]"
+            ],
+            "properties": {
+                "loadBalancingSettings": {
+                    "sampleSize": 4,
+                    "successfulSamplesRequired": 2,
+                    "additionalLatencyInMilliseconds": 0
+                },
+                "healthProbeSettings": {
+                    "probePath": "/$web/maintenance.html",
+                    "probeRequestType": "HEAD",
+                    "probeProtocol": "Https",
+                    "probeIntervalInSeconds": 30
+                },
+                "sessionAffinityState": "Enabled"
+            }
+        },
+        {
+            "type": "Microsoft.Cdn/profiles/origingroups",
+            "apiVersion": "2022-11-01-preview",
+            "name": "frontdoor-azworkbench-premium/storage",
+            "dependsOn": [
+                "[resourceId('Microsoft.Cdn/profiles', 'frontdoor-azworkbench-premium')]"
+            ],
+            "properties": {
+                "loadBalancingSettings": {
+                    "sampleSize": 4,
+                    "successfulSamplesRequired": 3,
+                    "additionalLatencyInMilliseconds": 50
+                },
+                "sessionAffinityState": "Disabled"
+            }
+        },
+        {
+            "type": "Microsoft.Cdn/profiles/rulesets",
+            "apiVersion": "2022-11-01-preview",
+            "name": "frontdoor-azworkbench-premium/MaintenancePage",
+            "dependsOn": [
+                "[resourceId('Microsoft.Cdn/profiles', 'frontdoor-azworkbench-premium')]"
+            ]
+        },
+        {
+            "type": "Microsoft.Cdn/profiles/rulesets",
+            "apiVersion": "2022-11-01-preview",
+            "name": "frontdoor-azworkbench-premium/SecurityHeadersCookies",
+            "dependsOn": [
+                "[resourceId('Microsoft.Cdn/profiles', 'frontdoor-azworkbench-premium')]"
+            ]
+        },
+        {
+            "type": "Microsoft.Cdn/profiles/rulesets",
+            "apiVersion": "2022-11-01-preview",
+            "name": "frontdoor-azworkbench-premium/UrlRedirectMigratedRuleSet1",
+            "dependsOn": [
+                "[resourceId('Microsoft.Cdn/profiles', 'frontdoor-azworkbench-premium')]"
+            ]
+        },
+        {
+            "type": "Microsoft.Cdn/profiles/secrets",
+            "apiVersion": "2022-11-01-preview",
+            "name": "frontdoor-azworkbench-premium/MigratedSecret-api-azureworkbench-com",
+            "dependsOn": [
+                "[resourceId('Microsoft.Cdn/profiles', 'frontdoor-azworkbench-premium')]"
+            ],
+            "properties": {
+                "parameters": {
+                    "type": "CustomerCertificate",
+                    "secretSource": {
+                        "id": "/subscriptions/ee611083-4581-4ba1-8116-a502d4539206/resourcegroups/rg-azworkbench-dev/providers/Microsoft.KeyVault/vaults/akv-azworkbench/secrets/azureworkbenched7033b0-d4a2-4f62-afaf-673f123491c6"
+                    },
+                    "useLatestVersion": true,
+                    "subjectAlternativeNames": []
+                }
+            }
+        },
+        {
+            "type": "Microsoft.Cdn/profiles/secrets",
+            "apiVersion": "2022-11-01-preview",
+            "name": "frontdoor-azworkbench-premium/MigratedSecret-beta-api-azureworkbench-com",
+            "dependsOn": [
+                "[resourceId('Microsoft.Cdn/profiles', 'frontdoor-azworkbench-premium')]"
+            ],
+            "properties": {
+                "parameters": {
+                    "type": "CustomerCertificate",
+                    "secretSource": {
+                        "id": "/subscriptions/ee611083-4581-4ba1-8116-a502d4539206/resourcegroups/rg-azworkbench-dev/providers/Microsoft.KeyVault/vaults/akv-azworkbench/secrets/azureworkbenched7033b0-d4a2-4f62-afaf-673f123491c6"
+                    },
+                    "useLatestVersion": true,
+                    "subjectAlternativeNames": []
+                }
+            }
+        },
+        {
+            "type": "Microsoft.Cdn/profiles/secrets",
+            "apiVersion": "2022-11-01-preview",
+            "name": "frontdoor-azworkbench-premium/MigratedSecret-beta-azureworkbench-com",
+            "dependsOn": [
+                "[resourceId('Microsoft.Cdn/profiles', 'frontdoor-azworkbench-premium')]"
+            ],
+            "properties": {
+                "parameters": {
+                    "type": "CustomerCertificate",
+                    "secretSource": {
+                        "id": "/subscriptions/ee611083-4581-4ba1-8116-a502d4539206/resourcegroups/rg-azworkbench-dev/providers/Microsoft.KeyVault/vaults/akv-azworkbench/secrets/azureworkbenched7033b0-d4a2-4f62-afaf-673f123491c6"
+                    },
+                    "useLatestVersion": true,
+                    "subjectAlternativeNames": []
+                }
+            }
+        },
+        {
+            "type": "Microsoft.Cdn/profiles/secrets",
+            "apiVersion": "2022-11-01-preview",
+            "name": "frontdoor-azworkbench-premium/MigratedSecret-www-azureworkbench-com",
+            "dependsOn": [
+                "[resourceId('Microsoft.Cdn/profiles', 'frontdoor-azworkbench-premium')]"
+            ],
+            "properties": {
+                "parameters": {
+                    "type": "CustomerCertificate",
+                    "secretSource": {
+                        "id": "/subscriptions/ee611083-4581-4ba1-8116-a502d4539206/resourcegroups/rg-azworkbench-dev/providers/Microsoft.KeyVault/vaults/akv-azworkbench/secrets/azureworkbenched7033b0-d4a2-4f62-afaf-673f123491c6"
+                    },
+                    "useLatestVersion": true,
+                    "subjectAlternativeNames": []
+                }
+            }
+        },
+        {
+            "type": "Microsoft.Cdn/profiles/customdomains",
+            "apiVersion": "2022-11-01-preview",
+            "name": "frontdoor-azworkbench-premium/api-azureworkbench-com",
+            "dependsOn": [
+                "[resourceId('Microsoft.Cdn/profiles', 'frontdoor-azworkbench-premium')]",
+                "[resourceId('Microsoft.Cdn/profiles/secrets', 'frontdoor-azworkbench-premium', 'MigratedSecret-api-azureworkbench-com')]"
+            ],
+            "properties": {
+                "hostName": "api.azureworkbench.com",
+                "tlsSettings": {
+                    "certificateType": "CustomerCertificate",
+                    "minimumTlsVersion": "TLS12",
+                    "secret": {
+                        "id": "[resourceId('Microsoft.Cdn/profiles/secrets', 'frontdoor-azworkbench-premium', 'MigratedSecret-api-azureworkbench-com')]"
+                    }
+                },
+                "extendedProperties": {
+                    "IsInternal": "false"
+                }
+            }
+        },
+        {
+            "type": "Microsoft.Cdn/profiles/customdomains",
+            "apiVersion": "2022-11-01-preview",
+            "name": "frontdoor-azworkbench-premium/beta-api-azureworkbench-com",
+            "dependsOn": [
+                "[resourceId('Microsoft.Cdn/profiles', 'frontdoor-azworkbench-premium')]",
+                "[resourceId('Microsoft.Cdn/profiles/secrets', 'frontdoor-azworkbench-premium', 'MigratedSecret-beta-api-azureworkbench-com')]"
+            ],
+            "properties": {
+                "hostName": "beta-api.azureworkbench.com",
+                "tlsSettings": {
+                    "certificateType": "CustomerCertificate",
+                    "minimumTlsVersion": "TLS12",
+                    "secret": {
+                        "id": "[resourceId('Microsoft.Cdn/profiles/secrets', 'frontdoor-azworkbench-premium', 'MigratedSecret-beta-api-azureworkbench-com')]"
+                    }
+                },
+                "extendedProperties": {
+                    "IsInternal": "false"
+                }
+            }
+        },
+        {
+            "type": "Microsoft.Cdn/profiles/customdomains",
+            "apiVersion": "2022-11-01-preview",
+            "name": "frontdoor-azworkbench-premium/beta-azureworkbench-com",
+            "dependsOn": [
+                "[resourceId('Microsoft.Cdn/profiles', 'frontdoor-azworkbench-premium')]",
+                "[resourceId('Microsoft.Cdn/profiles/secrets', 'frontdoor-azworkbench-premium', 'MigratedSecret-beta-azureworkbench-com')]"
+            ],
+            "properties": {
+                "hostName": "beta.azureworkbench.com",
+                "tlsSettings": {
+                    "certificateType": "CustomerCertificate",
+                    "minimumTlsVersion": "TLS12",
+                    "secret": {
+                        "id": "[resourceId('Microsoft.Cdn/profiles/secrets', 'frontdoor-azworkbench-premium', 'MigratedSecret-beta-azureworkbench-com')]"
+                    }
+                },
+                "extendedProperties": {
+                    "IsInternal": "false"
+                }
+            }
+        },
+        {
+            "type": "Microsoft.Cdn/profiles/customdomains",
+            "apiVersion": "2022-11-01-preview",
+            "name": "frontdoor-azworkbench-premium/www-azureworkbench-com",
+            "dependsOn": [
+                "[resourceId('Microsoft.Cdn/profiles', 'frontdoor-azworkbench-premium')]",
+                "[resourceId('Microsoft.Cdn/profiles/secrets', 'frontdoor-azworkbench-premium', 'MigratedSecret-www-azureworkbench-com')]"
+            ],
+            "properties": {
+                "hostName": "www.azureworkbench.com",
+                "tlsSettings": {
+                    "certificateType": "CustomerCertificate",
+                    "minimumTlsVersion": "TLS12",
+                    "secret": {
+                        "id": "[resourceId('Microsoft.Cdn/profiles/secrets', 'frontdoor-azworkbench-premium', 'MigratedSecret-www-azureworkbench-com')]"
+                    }
+                },
+                "extendedProperties": {
+                    "IsInternal": "false"
+                }
+            }
+        },
+        {
+            "type": "Microsoft.Cdn/profiles/origingroups/origins",
+            "apiVersion": "2022-11-01-preview",
+            "name": "frontdoor-azworkbench-premium/backend-api-dev/1e3d8adc-4dfd-45eb-9645-259abafe2d6f",
+            "dependsOn": [
+                "[resourceId('Microsoft.Cdn/profiles/origingroups', 'frontdoor-azworkbench-premium', 'backend-api-dev')]",
+                "[resourceId('Microsoft.Cdn/profiles', 'frontdoor-azworkbench-premium')]"
+            ],
+            "properties": {
+                "hostName": "webapp-api-dev.azurewebsites.net",
+                "httpPort": 80,
+                "httpsPort": 443,
+                "originHostHeader": "webapp-api-dev.azurewebsites.net",
+                "priority": 1,
+                "weight": 50,
+                "enabledState": "Enabled",
+                "enforceCertificateNameCheck": true
+            }
+        },
+        {
+            "type": "Microsoft.Cdn/profiles/origingroups/origins",
+            "apiVersion": "2022-11-01-preview",
+            "name": "frontdoor-azworkbench-premium/backend-api-prod/72d50af2-601c-481a-9f6b-047b4f49d793",
+            "dependsOn": [
+                "[resourceId('Microsoft.Cdn/profiles/origingroups', 'frontdoor-azworkbench-premium', 'backend-api-prod')]",
+                "[resourceId('Microsoft.Cdn/profiles', 'frontdoor-azworkbench-premium')]"
+            ],
+            "properties": {
+                "hostName": "webapp-api-prod.azurewebsites.net",
+                "httpPort": 80,
+                "httpsPort": 443,
+                "originHostHeader": "webapp-api-prod.azurewebsites.net",
+                "priority": 1,
+                "weight": 50,
+                "enabledState": "Enabled",
+                "enforceCertificateNameCheck": true
+            }
+        },
+        {
+            "type": "Microsoft.Cdn/profiles/origingroups/origins",
+            "apiVersion": "2022-11-01-preview",
+            "name": "frontdoor-azworkbench-premium/backend-new-portal-prod/ec70cb21-1a11-4d57-86f6-ce53a8862baf",
+            "dependsOn": [
+                "[resourceId('Microsoft.Cdn/profiles/origingroups', 'frontdoor-azworkbench-premium', 'backend-new-portal-prod')]",
+                "[resourceId('Microsoft.Cdn/profiles', 'frontdoor-azworkbench-premium')]"
+            ],
+            "properties": {
+                "hostName": "portal-azworkbench-prod.azurewebsites.net",
+                "httpPort": 80,
+                "httpsPort": 443,
+                "originHostHeader": "portal-azworkbench-prod.azurewebsites.net",
+                "priority": 1,
+                "weight": 50,
+                "enabledState": "Enabled",
+                "enforceCertificateNameCheck": true
+            }
+        },
+        {
+            "type": "Microsoft.Cdn/profiles/origingroups/origins",
+            "apiVersion": "2022-11-01-preview",
+            "name": "frontdoor-azworkbench-premium/backend-portal-dev/22d809cf-b8f5-4e6d-b4d6-c43e08c33554",
+            "dependsOn": [
+                "[resourceId('Microsoft.Cdn/profiles/origingroups', 'frontdoor-azworkbench-premium', 'backend-portal-dev')]",
+                "[resourceId('Microsoft.Cdn/profiles', 'frontdoor-azworkbench-premium')]"
+            ],
+            "properties": {
+                "hostName": "portal-azworkbench-dev.azurewebsites.net",
+                "httpPort": 80,
+                "httpsPort": 443,
+                "originHostHeader": "portal-azworkbench-dev.azurewebsites.net",
+                "priority": 1,
+                "weight": 50,
+                "enabledState": "Enabled",
+                "enforceCertificateNameCheck": true
+            }
+        },
+        {
+            "type": "Microsoft.Cdn/profiles/origingroups/origins",
+            "apiVersion": "2022-11-01-preview",
+            "name": "frontdoor-azworkbench-premium/Maintenance/378d620d-95c0-486c-b2ae-2f6629087215",
+            "dependsOn": [
+                "[resourceId('Microsoft.Cdn/profiles/origingroups', 'frontdoor-azworkbench-premium', 'Maintenance')]",
+                "[resourceId('Microsoft.Cdn/profiles', 'frontdoor-azworkbench-premium')]"
+            ],
+            "properties": {
+                "hostName": "strgworkbenchdev.blob.core.windows.net",
+                "httpPort": 80,
+                "httpsPort": 443,
+                "originHostHeader": "strgworkbenchdev.blob.core.windows.net",
+                "priority": 1,
+                "weight": 50,
+                "enabledState": "Enabled",
+                "enforceCertificateNameCheck": true
+            }
+        },
+        {
+            "type": "Microsoft.Cdn/profiles/origingroups/origins",
+            "apiVersion": "2022-11-01-preview",
+            "name": "frontdoor-azworkbench-premium/storage/cdn-storage",
+            "dependsOn": [
+                "[resourceId('Microsoft.Cdn/profiles/origingroups', 'frontdoor-azworkbench-premium', 'storage')]",
+                "[resourceId('Microsoft.Cdn/profiles', 'frontdoor-azworkbench-premium')]"
+            ],
+            "properties": {
+                "hostName": "strgwxzazurehometransfer.blob.core.windows.net",
+                "httpPort": 80,
+                "httpsPort": 443,
+                "originHostHeader": "strgwxzazurehometransfer.blob.core.windows.net",
+                "priority": 1,
+                "weight": 1000,
+                "enabledState": "Enabled",
+                "enforceCertificateNameCheck": true
+            }
+        },
+        {
+            "type": "Microsoft.Cdn/profiles/rulesets/rules",
+            "apiVersion": "2022-11-01-preview",
+            "name": "frontdoor-azworkbench-premium/MaintenancePage/MaintenancePage",
+            "dependsOn": [
+                "[resourceId('Microsoft.Cdn/profiles/rulesets', 'frontdoor-azworkbench-premium', 'MaintenancePage')]",
+                "[resourceId('Microsoft.Cdn/profiles', 'frontdoor-azworkbench-premium')]"
+            ],
+            "properties": {
+                "order": 1,
+                "conditions": [
+                    {
+                        "name": "HostName",
+                        "parameters": {
+                            "typeName": "DeliveryRuleHostNameConditionParameters",
+                            "operator": "Equal",
+                            "negateCondition": false,
+                            "matchValues": [
+                                "beta.azureworkbench.com"
+                            ],
+                            "transforms": []
+                        }
+                    }
+                ],
+                "actions": [
+                    {
+                        "name": "UrlRedirect",
+                        "parameters": {
+                            "typeName": "DeliveryRuleUrlRedirectActionParameters",
+                            "redirectType": "TemporaryRedirect",
+                            "destinationProtocol": "Https",
+                            "customPath": "/",
+                            "customHostname": "appsvc-azworkbench-maintenancepage.azurewebsites.net"
+                        }
+                    }
+                ],
+                "matchProcessingBehavior": "Continue"
+            }
+        },
+        {
+            "type": "Microsoft.Cdn/profiles/rulesets/rules",
+            "apiVersion": "2022-11-01-preview",
+            "name": "frontdoor-azworkbench-premium/SecurityHeadersCookies/ContentSecurityPolicyXSS",
+            "dependsOn": [
+                "[resourceId('Microsoft.Cdn/profiles/rulesets', 'frontdoor-azworkbench-premium', 'SecurityHeadersCookies')]",
+                "[resourceId('Microsoft.Cdn/profiles', 'frontdoor-azworkbench-premium')]"
+            ],
+            "properties": {
+                "order": 0,
+                "conditions": [],
+                "actions": [
+                    {
+                        "name": "ModifyResponseHeader",
+                        "parameters": {
+                            "typeName": "DeliveryRuleHeaderActionParameters",
+                            "headerAction": "Append",
+                            "headerName": "Content-Security-Policy",
+                            "value": "default-src 'self' *.azureworkbench.com;  script-src 'self' *.azureworkbench.com www.googletagmanager.com 'unsafe-inline';  img-src 'self' data: blob: *.azureworkbench.com 'unsafe-inline';  style-src 'self' *.azureworkbench.com www.googletagmanager.com 'unsafe-inline';  script-src-elem 'unsafe-inline' *.azureworkbench.com *.vo.msecnd.net *.msecnd.net www.googletagmanager.com;  connect-src 'self' *.azureworkbench.com *.b2clogin.com dc.services.visualstudio.com *.microsoftonline.com *.core.windows.net *.blob.core.windows.net; frame-src 'self' *.azureworkbench.com *.microsoftonline.com"
+                        }
+                    }
+                ],
+                "matchProcessingBehavior": "Continue"
+            }
+        },
+        {
+            "type": "Microsoft.Cdn/profiles/rulesets/rules",
+            "apiVersion": "2022-11-01-preview",
+            "name": "frontdoor-azworkbench-premium/SecurityHeadersCookies/HSTS",
+            "dependsOn": [
+                "[resourceId('Microsoft.Cdn/profiles/rulesets', 'frontdoor-azworkbench-premium', 'SecurityHeadersCookies')]",
+                "[resourceId('Microsoft.Cdn/profiles', 'frontdoor-azworkbench-premium')]"
+            ],
+            "properties": {
+                "order": 1,
+                "conditions": [],
+                "actions": [
+                    {
+                        "name": "ModifyResponseHeader",
+                        "parameters": {
+                            "typeName": "DeliveryRuleHeaderActionParameters",
+                            "headerAction": "Append",
+                            "headerName": "Strict-Transport-Security",
+                            "value": "max-age=31536000; includeSubDomains"
+                        }
+                    }
+                ],
+                "matchProcessingBehavior": "Continue"
+            }
+        },
+        {
+            "type": "Microsoft.Cdn/profiles/rulesets/rules",
+            "apiVersion": "2022-11-01-preview",
+            "name": "frontdoor-azworkbench-premium/SecurityHeadersCookies/XFrameOprions",
+            "dependsOn": [
+                "[resourceId('Microsoft.Cdn/profiles/rulesets', 'frontdoor-azworkbench-premium', 'SecurityHeadersCookies')]",
+                "[resourceId('Microsoft.Cdn/profiles', 'frontdoor-azworkbench-premium')]"
+            ],
+            "properties": {
+                "order": 2,
+                "conditions": [],
+                "actions": [
+                    {
+                        "name": "ModifyResponseHeader",
+                        "parameters": {
+                            "typeName": "DeliveryRuleHeaderActionParameters",
+                            "headerAction": "Append",
+                            "headerName": "X-Frame-Options",
+                            "value": "SAMEORIGIN"
+                        }
+                    }
+                ],
+                "matchProcessingBehavior": "Continue"
+            }
+        },
+        {
+            "type": "Microsoft.Cdn/profiles/rulesets/rules",
+            "apiVersion": "2022-11-01-preview",
+            "name": "frontdoor-azworkbench-premium/UrlRedirectMigratedRuleSet1/UrlRedirectMigratedRule",
+            "dependsOn": [
+                "[resourceId('Microsoft.Cdn/profiles/rulesets', 'frontdoor-azworkbench-premium', 'UrlRedirectMigratedRuleSet1')]",
+                "[resourceId('Microsoft.Cdn/profiles', 'frontdoor-azworkbench-premium')]"
+            ],
+            "properties": {
+                "order": 1,
+                "conditions": [],
+                "actions": [
+                    {
+                        "name": "UrlRedirect",
+                        "parameters": {
+                            "typeName": "DeliveryRuleUrlRedirectActionParameters",
+                            "redirectType": "Found",
+                            "destinationProtocol": "Https"
+                        }
+                    }
+                ],
+                "matchProcessingBehavior": "Continue"
+            }
+        },
+        {
+            "type": "Microsoft.Cdn/profiles/securitypolicies",
+            "apiVersion": "2022-11-01-preview",
+            "name": "frontdoor-azworkbench-premium/wafPoliciesFrondoorAzworkbenchPremium-securityPolicy",
+            "dependsOn": [
+                "[resourceId('Microsoft.Cdn/profiles', 'frontdoor-azworkbench-premium')]",
+                "[resourceId('Microsoft.Network/frontdoorwebapplicationfirewallpolicies', 'wafPoliciesFrondoorAzworkbenchPremium')]",
+                "[resourceId('Microsoft.Cdn/profiles/customdomains', 'frontdoor-azworkbench-premium', 'beta-api-azureworkbench-com')]",
+                "[resourceId('Microsoft.Cdn/profiles/customdomains', 'frontdoor-azworkbench-premium', 'api-azureworkbench-com')]"
+            ],
+            "properties": {
+                "parameters": {
+                    "wafPolicy": {
+                        "id": "[resourceId('Microsoft.Network/frontdoorwebapplicationfirewallpolicies', 'wafPoliciesFrondoorAzworkbenchPremium')]"
+                    },
+                    "associations": [
+                        {
+                            "domains": [
+                                {
+                                    "id": "[resourceId('Microsoft.Cdn/profiles/customdomains', 'frontdoor-azworkbench-premium', 'beta-api-azureworkbench-com')]"
+                                },
+                                {
+                                    "id": "[resourceId('Microsoft.Cdn/profiles/customdomains', 'frontdoor-azworkbench-premium', 'api-azureworkbench-com')]"
+                                }
+                            ],
+                            "patternsToMatch": [
+                                "/*"
+                            ]
+                        }
+                    ],
+                    "type": "WebApplicationFirewall"
+                }
+            }
+        },
+        {
+            "type": "Microsoft.Cdn/profiles/afdendpoints/routes",
+            "apiVersion": "2022-11-01-preview",
+            "name": "frontdoor-azworkbench-premium/frontdoor-azworkbench/routingrule-api-beta",
+            "dependsOn": [
+                "[resourceId('Microsoft.Cdn/profiles/afdendpoints', 'frontdoor-azworkbench-premium', 'frontdoor-azworkbench')]",
+                "[resourceId('Microsoft.Cdn/profiles', 'frontdoor-azworkbench-premium')]",
+                "[resourceId('Microsoft.Cdn/profiles/customdomains', 'frontdoor-azworkbench-premium', 'beta-api-azureworkbench-com')]",
+                "[resourceId('Microsoft.Cdn/profiles/origingroups', 'frontdoor-azworkbench-premium', 'backend-api-dev')]",
+                "[resourceId('Microsoft.Cdn/profiles/rulesets', 'frontdoor-azworkbench-premium', 'SecurityHeadersCookies')]"
+            ],
+            "properties": {
+                "customDomains": [
+                    {
+                        "id": "[resourceId('Microsoft.Cdn/profiles/customdomains', 'frontdoor-azworkbench-premium', 'beta-api-azureworkbench-com')]"
+                    }
+                ],
+                "originGroup": {
+                    "id": "[resourceId('Microsoft.Cdn/profiles/origingroups', 'frontdoor-azworkbench-premium', 'backend-api-dev')]"
+                },
+                "ruleSets": [
+                    {
+                        "id": "[resourceId('Microsoft.Cdn/profiles/rulesets', 'frontdoor-azworkbench-premium', 'SecurityHeadersCookies')]"
+                    }
+                ],
+                "supportedProtocols": [
+                    "Https"
+                ],
+                "patternsToMatch": [
+                    "/*"
+                ],
+                "forwardingProtocol": "HttpsOnly",
+                "linkToDefaultDomain": "Disabled",
+                "httpsRedirect": "Disabled",
+                "enabledState": "Enabled"
+            }
+        },
+        {
+            "type": "Microsoft.Cdn/profiles/afdendpoints/routes",
+            "apiVersion": "2022-11-01-preview",
+            "name": "frontdoor-azworkbench-premium/frontdoor-azworkbench/routingrule-api-prod",
+            "dependsOn": [
+                "[resourceId('Microsoft.Cdn/profiles/afdendpoints', 'frontdoor-azworkbench-premium', 'frontdoor-azworkbench')]",
+                "[resourceId('Microsoft.Cdn/profiles', 'frontdoor-azworkbench-premium')]",
+                "[resourceId('Microsoft.Cdn/profiles/customdomains', 'frontdoor-azworkbench-premium', 'api-azureworkbench-com')]",
+                "[resourceId('Microsoft.Cdn/profiles/origingroups', 'frontdoor-azworkbench-premium', 'backend-api-prod')]",
+                "[resourceId('Microsoft.Cdn/profiles/rulesets', 'frontdoor-azworkbench-premium', 'SecurityHeadersCookies')]"
+            ],
+            "properties": {
+                "customDomains": [
+                    {
+                        "id": "[resourceId('Microsoft.Cdn/profiles/customdomains', 'frontdoor-azworkbench-premium', 'api-azureworkbench-com')]"
+                    }
+                ],
+                "originGroup": {
+                    "id": "[resourceId('Microsoft.Cdn/profiles/origingroups', 'frontdoor-azworkbench-premium', 'backend-api-prod')]"
+                },
+                "ruleSets": [
+                    {
+                        "id": "[resourceId('Microsoft.Cdn/profiles/rulesets', 'frontdoor-azworkbench-premium', 'SecurityHeadersCookies')]"
+                    }
+                ],
+                "supportedProtocols": [
+                    "Https"
+                ],
+                "patternsToMatch": [
+                    "/*"
+                ],
+                "forwardingProtocol": "HttpsOnly",
+                "linkToDefaultDomain": "Disabled",
+                "httpsRedirect": "Disabled",
+                "enabledState": "Enabled"
+            }
+        },
+        {
+            "type": "Microsoft.Cdn/profiles/afdendpoints/routes",
+            "apiVersion": "2022-11-01-preview",
+            "name": "frontdoor-azworkbench-premium/frontdoor-azworkbench/routingrule-portal-beta",
+            "dependsOn": [
+                "[resourceId('Microsoft.Cdn/profiles/afdendpoints', 'frontdoor-azworkbench-premium', 'frontdoor-azworkbench')]",
+                "[resourceId('Microsoft.Cdn/profiles', 'frontdoor-azworkbench-premium')]",
+                "[resourceId('Microsoft.Cdn/profiles/customdomains', 'frontdoor-azworkbench-premium', 'beta-azureworkbench-com')]",
+                "[resourceId('Microsoft.Cdn/profiles/origingroups', 'frontdoor-azworkbench-premium', 'backend-portal-dev')]",
+                "[resourceId('Microsoft.Cdn/profiles/rulesets', 'frontdoor-azworkbench-premium', 'SecurityHeadersCookies')]"
+            ],
+            "properties": {
+                "cacheConfiguration": {
+                    "compressionSettings": {
+                        "isCompressionEnabled": true,
+                        "contentTypesToCompress": [
+                            "application/eot",
+                            "application/font",
+                            "application/font-sfnt",
+                            "application/javascript",
+                            "application/json",
+                            "application/opentype",
+                            "application/otf",
+                            "application/pkcs7-mime",
+                            "application/truetype",
+                            "application/ttf",
+                            "application/vnd.ms-fontobject",
+                            "application/xhtml+xml",
+                            "application/xml",
+                            "application/xml+rss",
+                            "application/x-font-opentype",
+                            "application/x-font-truetype",
+                            "application/x-font-ttf",
+                            "application/x-httpd-cgi",
+                            "application/x-javascript",
+                            "application/x-mpegurl",
+                            "application/x-opentype",
+                            "application/x-otf",
+                            "application/x-perl",
+                            "application/x-ttf",
+                            "font/eot",
+                            "font/ttf",
+                            "font/otf",
+                            "font/opentype",
+                            "image/svg+xml",
+                            "text/css",
+                            "text/csv",
+                            "text/html",
+                            "text/javascript",
+                            "text/js",
+                            "text/plain",
+                            "text/richtext",
+                            "text/tab-separated-values",
+                            "text/xml",
+                            "text/x-script",
+                            "text/x-component",
+                            "text/x-java-source"
+                        ]
+                    },
+                    "queryStringCachingBehavior": "UseQueryString"
+                },
+                "customDomains": [
+                    {
+                        "id": "[resourceId('Microsoft.Cdn/profiles/customdomains', 'frontdoor-azworkbench-premium', 'beta-azureworkbench-com')]"
+                    }
+                ],
+                "originGroup": {
+                    "id": "[resourceId('Microsoft.Cdn/profiles/origingroups', 'frontdoor-azworkbench-premium', 'backend-portal-dev')]"
+                },
+                "ruleSets": [
+                    {
+                        "id": "[resourceId('Microsoft.Cdn/profiles/rulesets', 'frontdoor-azworkbench-premium', 'SecurityHeadersCookies')]"
+                    }
+                ],
+                "supportedProtocols": [
+                    "Https"
+                ],
+                "patternsToMatch": [
+                    "/*"
+                ],
+                "forwardingProtocol": "HttpsOnly",
+                "linkToDefaultDomain": "Disabled",
+                "httpsRedirect": "Disabled",
+                "enabledState": "Enabled"
+            }
+        },
+        {
+            "type": "Microsoft.Cdn/profiles/afdendpoints/routes",
+            "apiVersion": "2022-11-01-preview",
+            "name": "frontdoor-azworkbench-premium/frontdoor-azworkbench/routingrule-portal-prod",
+            "dependsOn": [
+                "[resourceId('Microsoft.Cdn/profiles/afdendpoints', 'frontdoor-azworkbench-premium', 'frontdoor-azworkbench')]",
+                "[resourceId('Microsoft.Cdn/profiles', 'frontdoor-azworkbench-premium')]",
+                "[resourceId('Microsoft.Cdn/profiles/customdomains', 'frontdoor-azworkbench-premium', 'www-azureworkbench-com')]",
+                "[resourceId('Microsoft.Cdn/profiles/origingroups', 'frontdoor-azworkbench-premium', 'backend-new-portal-prod')]",
+                "[resourceId('Microsoft.Cdn/profiles/rulesets', 'frontdoor-azworkbench-premium', 'SecurityHeadersCookies')]"
+            ],
+            "properties": {
+                "cacheConfiguration": {
+                    "compressionSettings": {
+                        "isCompressionEnabled": true,
+                        "contentTypesToCompress": [
+                            "application/eot",
+                            "application/font",
+                            "application/font-sfnt",
+                            "application/javascript",
+                            "application/json",
+                            "application/opentype",
+                            "application/otf",
+                            "application/pkcs7-mime",
+                            "application/truetype",
+                            "application/ttf",
+                            "application/vnd.ms-fontobject",
+                            "application/xhtml+xml",
+                            "application/xml",
+                            "application/xml+rss",
+                            "application/x-font-opentype",
+                            "application/x-font-truetype",
+                            "application/x-font-ttf",
+                            "application/x-httpd-cgi",
+                            "application/x-javascript",
+                            "application/x-mpegurl",
+                            "application/x-opentype",
+                            "application/x-otf",
+                            "application/x-perl",
+                            "application/x-ttf",
+                            "font/eot",
+                            "font/ttf",
+                            "font/otf",
+                            "font/opentype",
+                            "image/svg+xml",
+                            "text/css",
+                            "text/csv",
+                            "text/html",
+                            "text/javascript",
+                            "text/js",
+                            "text/plain",
+                            "text/richtext",
+                            "text/tab-separated-values",
+                            "text/xml",
+                            "text/x-script",
+                            "text/x-component",
+                            "text/x-java-source"
+                        ]
+                    },
+                    "queryStringCachingBehavior": "UseQueryString"
+                },
+                "customDomains": [
+                    {
+                        "id": "[resourceId('Microsoft.Cdn/profiles/customdomains', 'frontdoor-azworkbench-premium', 'www-azureworkbench-com')]"
+                    }
+                ],
+                "originGroup": {
+                    "id": "[resourceId('Microsoft.Cdn/profiles/origingroups', 'frontdoor-azworkbench-premium', 'backend-new-portal-prod')]"
+                },
+                "ruleSets": [
+                    {
+                        "id": "[resourceId('Microsoft.Cdn/profiles/rulesets', 'frontdoor-azworkbench-premium', 'SecurityHeadersCookies')]"
+                    }
+                ],
+                "supportedProtocols": [
+                    "Https"
+                ],
+                "patternsToMatch": [
+                    "/*"
+                ],
+                "forwardingProtocol": "HttpsOnly",
+                "linkToDefaultDomain": "Disabled",
+                "httpsRedirect": "Disabled",
+                "enabledState": "Enabled"
+            }
+        },
+        {
+            "type": "Microsoft.Cdn/profiles/afdendpoints/routes",
+            "apiVersion": "2022-11-01-preview",
+            "name": "frontdoor-azworkbench-premium/frontdoor-azworkbench/Http2Https",
+            "dependsOn": [
+                "[resourceId('Microsoft.Cdn/profiles/afdendpoints', 'frontdoor-azworkbench-premium', 'frontdoor-azworkbench')]",
+                "[resourceId('Microsoft.Cdn/profiles', 'frontdoor-azworkbench-premium')]",
+                "[resourceId('Microsoft.Cdn/profiles/customdomains', 'frontdoor-azworkbench-premium', 'beta-azureworkbench-com')]",
+                "[resourceId('Microsoft.Cdn/profiles/customdomains', 'frontdoor-azworkbench-premium', 'www-azureworkbench-com')]",
+                "[resourceId('Microsoft.Cdn/profiles/customdomains', 'frontdoor-azworkbench-premium', 'frontdoor-azworkbench-azurefd-net')]",
+                "[resourceId('Microsoft.Cdn/profiles/origingroups', 'frontdoor-azworkbench-premium', 'backend-portal-dev')]",
+                "[resourceId('Microsoft.Cdn/profiles/rulesets', 'frontdoor-azworkbench-premium', 'UrlRedirectMigratedRuleSet1')]"
+            ],
+            "properties": {
+                "customDomains": [
+                    {
+                        "id": "[resourceId('Microsoft.Cdn/profiles/customdomains', 'frontdoor-azworkbench-premium', 'beta-azureworkbench-com')]"
+                    },
+                    {
+                        "id": "[resourceId('Microsoft.Cdn/profiles/customdomains', 'frontdoor-azworkbench-premium', 'www-azureworkbench-com')]"
+                    },
+                    {
+                        "id": "[resourceId('Microsoft.Cdn/profiles/customdomains', 'frontdoor-azworkbench-premium', 'frontdoor-azworkbench-azurefd-net')]"
+                    }
+                ],
+                "originGroup": {
+                    "id": "[resourceId('Microsoft.Cdn/profiles/origingroups', 'frontdoor-azworkbench-premium', 'backend-portal-dev')]"
+                },
+                "ruleSets": [
+                    {
+                        "id": "[resourceId('Microsoft.Cdn/profiles/rulesets', 'frontdoor-azworkbench-premium', 'UrlRedirectMigratedRuleSet1')]"
+                    }
+                ],
+                "supportedProtocols": [
+                    "Http"
+                ],
+                "patternsToMatch": [
+                    "/*"
+                ],
+                "forwardingProtocol": "MatchRequest",
+                "linkToDefaultDomain": "Enabled",
+                "httpsRedirect": "Disabled",
+                "enabledState": "Enabled"
+            }
+        }
+    ]
+}
